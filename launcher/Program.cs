@@ -44,11 +44,52 @@ namespace Launcher
                     Console.WriteLine($"[Warning] Could not connect to GitHub. Proceeding with offline version. Error: {ex.Message}");
                 }
 
-                // 2. Read local version
+                // 1.5 Ensure config.json exists
+                string configPath = "config.json";
+                if (!File.Exists(configPath))
+                {
+                    Console.WriteLine("[Warning] config.json not found. Creating a default skeleton.");
+                    string defaultConfig = @"{
+  ""OracleApexBaseUrl"": ""https://your-database-url/ords/your_workspace"",
+  ""PuertoServidorLocal"": 5000,
+  ""MinutosReintentoSync"": 30,
+  ""Separator"": "" - "",
+  ""VentaPrefix"": ""#VENTA"",
+  ""PagoPrefix"": ""#PAGO"",
+  ""VentaTags"": {
+    ""Vendedor"": ""Vendedor:"",
+    ""Cliente"": ""Cliente:"",
+    ""Tlf"": ""Tlf:"",
+    ""Tipo"": ""Tipo:"",
+    ""Ancho"": ""Ancho:"",
+    ""Largo"": ""Largo:"",
+    ""Cant"": ""Cant:"",
+    ""Tot"": ""Tot:"",
+    ""Ade"": ""Ade:"",
+    ""Est"": ""Est:"",
+    ""Maq"": ""Maq:"",
+    ""Med"": ""Med:""
+  },
+  ""PagoTags"": {
+    ""Vendedor"": ""Vendedor:"",
+    ""Cliente"": ""Cliente:"",
+    ""Monto"": ""Monto:"",
+    ""Medio"": ""Medio:""
+  }
+}";
+                    await File.WriteAllTextAsync(configPath, defaultConfig);
+                    Console.WriteLine("Please edit config.json with your actual settings before running the sync process.");
+                }
+
+                // 2. Read local version (assume 0.0 if not found)
                 string localVersionStr = "0.0";
                 if (File.Exists(LOCAL_VERSION_FILE))
                 {
                     localVersionStr = File.ReadAllText(LOCAL_VERSION_FILE).Trim();
+                }
+                else
+                {
+                     Console.WriteLine("[Info] Local version.txt not found. Assuming initial installation (v0.0).");
                 }
 
                 if (Version.TryParse(remoteVersionStr, out Version remoteVersion) && 
