@@ -1,0 +1,23 @@
+# Config and Database (Never sync, these are local secrets/data)
+config.json
+*.db
+*.db-shm
+*.db-wal
+icon_128x128.png
+promo_640x400.png
+store_screenshot_1280x800.jpg
+whatsapp-ext-v2.zip
+.gemini/
+resizer/
+
+# .NET Core
+bin/
+obj/
+
+# Visual Studio / IDE
+.vs/
+.vscode/
+
+# Ignore the published standalone .exe from git tracking except the specific one we are uploading
+**/bin/Release/net8.0/win-x64/publish/WhatsAppTranscriptor.pdb
+**/bin/Release/net8.0/win-x64/publish/WhatsAppTranscriptor.deps.json
