@@ -84,23 +84,19 @@ namespace WhatsAppTranscriptor
     public class VentaTags
     {
         public string Vendedor { get; set; } = "Vendedor:";
-        public string Cliente { get; set; } = "Cliente:";
-        public string Tlf { get; set; } = "Tlf:";
-        public string Tipo { get; set; } = "Tipo:";
+        public string Prod { get; set; } = "Prod:";
         public string Ancho { get; set; } = "Ancho:";
         public string Largo { get; set; } = "Largo:";
         public string Cant { get; set; } = "Cant:";
         public string Tot { get; set; } = "Tot:";
-        public string Ade { get; set; } = "Ade:";
+        public string Medio { get; set; } = "Medio:";
         public string Est { get; set; } = "Est:";
         public string Maq { get; set; } = "Maq:";
-        public string Med { get; set; } = "Med:";
     }
 
     public class PagoTags
     {
         public string Vendedor { get; set; } = "Vendedor:";
-        public string Cliente { get; set; } = "Cliente:";
         public string Monto { get; set; } = "Monto:";
         public string Medio { get; set; } = "Medio:";
     }
@@ -184,13 +180,12 @@ FORMATOS ESPERADOS PARA EXTRAER VENTAS:
 El vendedor debe enviar un mensaje a su propio chat local
 o al chat del cliente con la siguiente estructura:
 
-#VENTA - #NOMBRE_VENDEDOR - Cliente: Nombre Apellido - Tipo: UV DTF - Ancho: 10 - Largo: 20 - Cant: 50 - Tot: 150 - Ade: 50 - Est: Proceso - Maq: Fortune - Med: Yape
+#VENTA - Vendedor: ALFREDO - Prod: Banner - Ancho: 150 - Largo: 300 - Cant: 2 - Tot: 150.50 - Medio: Yape - Est: En proceso - Maq: Plotter 1
 
-* Maq (Máquina) y Med (Medio de Pago) son obligatorios 
+* Maq (Máquina) y Medio (Medio de Pago) son obligatorios 
   para sincronizar bien a Oracle APEX.
-* IMPORTANTE: Ancho y Largo deben estar en METROS.
-* El Teléfono (Tlf:) se extrae automáticamente del chat.
-  (Solo inclúyelo a mano si el cliente usa otro número).
+* IMPORTANTE: Ancho y Largo deben estar en METROS o como lo reciba APEX.
+* El Cliente se extrae automáticamente del nombre de contacto del chat.
 * ¡El sistema agrupará ventas del mismo día bajo una 
   sola Proforma automáticamente!
 
@@ -199,7 +194,7 @@ FORMATOS ESPERADOS PARA EXTRAER PAGOS AISLADOS:
 Cuando un cliente hace un abono de una Venta de horas o 
 días anteriores, envía el siguiente formato:
 
-#PAGO - #NOMBRE_VENDEDOR - Cliente: Nombre - Monto: 50 - Medio: Plin
+#PAGO - Vendedor: ALFREDO - Monto: 50 - Medio: Plin
 =========================================================
 ");
             
@@ -294,17 +289,17 @@ días anteriores, envía el siguiente formato:
                                                  // Tag parsing based on external configuration
                                                  if (cleanPart.StartsWith("#") && cleanPart.ToUpper() != ConfigManager.Settings.VentaPrefix.ToUpper()) sale.SellerName = cleanPart.Substring(1).Trim();
                                                  else if (cleanPart.StartsWith(tags.Vendedor, StringComparison.OrdinalIgnoreCase)) sale.SellerName = cleanPart.Substring(tags.Vendedor.Length).Trim();
-                                                 else if (cleanPart.StartsWith(tags.Cliente, StringComparison.OrdinalIgnoreCase)) sale.Client = cleanPart.Substring(tags.Cliente.Length).Trim();
-                                                 else if (cleanPart.StartsWith(tags.Tlf, StringComparison.OrdinalIgnoreCase)) sale.PhoneNumber = cleanPart.Substring(tags.Tlf.Length).Trim();
-                                                 else if (cleanPart.StartsWith(tags.Tipo, StringComparison.OrdinalIgnoreCase)) sale.ProductType = cleanPart.Substring(tags.Tipo.Length).Trim();
+                                                 else if (cleanPart.StartsWith(tags.Prod, StringComparison.OrdinalIgnoreCase)) sale.ProductType = cleanPart.Substring(tags.Prod.Length).Trim();
                                                  else if (cleanPart.StartsWith(tags.Ancho, StringComparison.OrdinalIgnoreCase)) sale.Width = cleanPart.Substring(tags.Ancho.Length).Trim();
                                                  else if (cleanPart.StartsWith(tags.Largo, StringComparison.OrdinalIgnoreCase)) sale.Length = cleanPart.Substring(tags.Largo.Length).Trim();
                                                  else if (cleanPart.StartsWith(tags.Cant, StringComparison.OrdinalIgnoreCase)) sale.Quantity = cleanPart.Substring(tags.Cant.Length).Trim();
                                                  else if (cleanPart.StartsWith(tags.Tot, StringComparison.OrdinalIgnoreCase)) sale.Total = cleanPart.Substring(tags.Tot.Length).Trim();
-                                                 else if (cleanPart.StartsWith(tags.Ade, StringComparison.OrdinalIgnoreCase)) sale.AdvancePayment = cleanPart.Substring(tags.Ade.Length).Trim();
+                                                 else if (cleanPart.StartsWith(tags.Medio, StringComparison.OrdinalIgnoreCase)) {
+                                                     sale.AdvancePayment = cleanPart.Substring(tags.Medio.Length).Trim(); // Used as amount if digits, or payment method otherwise
+                                                     paymentMethod = cleanPart.Substring(tags.Medio.Length).Trim();
+                                                 }
                                                  else if (cleanPart.StartsWith(tags.Est, StringComparison.OrdinalIgnoreCase)) sale.Status = cleanPart.Substring(tags.Est.Length).Trim();
                                                  else if (cleanPart.StartsWith(tags.Maq, StringComparison.OrdinalIgnoreCase)) maquinaName = cleanPart.Substring(tags.Maq.Length).Trim();
-                                                 else if (cleanPart.StartsWith(tags.Med, StringComparison.OrdinalIgnoreCase)) paymentMethod = cleanPart.Substring(tags.Med.Length).Trim();
                                              }
                                              
                                              // Implicit fallback if salesperson didn't type it explicitly
@@ -438,10 +433,6 @@ días anteriores, envía el siguiente formato:
                                                      payment.SellerName = piece.Substring(1).Trim();
                                                  } else if (piece.StartsWith(pTags.Vendedor, StringComparison.OrdinalIgnoreCase)) {
                                                      payment.SellerName = piece.Substring(pTags.Vendedor.Length).Trim();
-                                                 } else if (piece.StartsWith(pTags.Cliente, StringComparison.OrdinalIgnoreCase)) {
-                                                     payment.Client = piece.Substring(pTags.Cliente.Length).Trim();
-                                                 } else if (piece.StartsWith("Tlf:", StringComparison.OrdinalIgnoreCase) || piece.StartsWith("Telefono:", StringComparison.OrdinalIgnoreCase)) {
-                                                     payment.PhoneNumber = piece.Split(':')[1].Trim();
                                                  } else if (piece.StartsWith(pTags.Monto, StringComparison.OrdinalIgnoreCase)) {
                                                      string amtStr = piece.Substring(pTags.Monto.Length).Trim();
                                                      if (decimal.TryParse(amtStr, out decimal parsedAmt)) payment.Amount = parsedAmt;
