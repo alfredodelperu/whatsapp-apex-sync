@@ -1,6 +1,7 @@
 using System;
 using System.Diagnostics;
 using System.IO;
+using System.IO.Compression;
 using System.Net.Http;
 using System.Threading.Tasks;
 
@@ -10,9 +11,10 @@ namespace Launcher
     {
         private const string REPO_RAW_URL = "https://raw.githubusercontent.com/alfredodelperu/whatsapp-apex-sync/main";
         private const string VERSION_FILE_URL = $"{REPO_RAW_URL}/version.txt";
-        private const string EXE_DOWNLOAD_URL = $"{REPO_RAW_URL}/backend/bin/Release/net8.0/win-x64/publish/WhatsAppTranscriptor.exe";
+        private const string ZIP_DOWNLOAD_URL = $"{REPO_RAW_URL}/update.zip";
         
         private const string LOCAL_EXE_NAME = "WhatsAppTranscriptor.exe";
+        private const string APP_FOLDER_NAME = "app";
         private const string LOCAL_VERSION_FILE = "version.txt";
 
         static async Task Main(string[] args)
@@ -61,16 +63,22 @@ namespace Launcher
                         // Kill any running instances of the app before overwriting
                         KillRunningProcesses(LOCAL_EXE_NAME.Replace(".exe", ""));
 
-                        // Download the new executable
-                        byte[] exeBytes = await client.GetByteArrayAsync(EXE_DOWNLOAD_URL);
+                        Console.WriteLine("Downloading update.zip...");
+                        byte[] zipBytes = await client.GetByteArrayAsync(ZIP_DOWNLOAD_URL);
                         
-                        // Write to temp file first to prevent corruption
-                        string tempExe = LOCAL_EXE_NAME + ".tmp";
-                        await File.WriteAllBytesAsync(tempExe, exeBytes);
+                        string tempZip = "update.tmp.zip";
+                        await File.WriteAllBytesAsync(tempZip, zipBytes);
                         
-                        // Replace the old executable safely
-                        if (File.Exists(LOCAL_EXE_NAME)) File.Delete(LOCAL_EXE_NAME);
-                        File.Move(tempExe, LOCAL_EXE_NAME);
+                        Console.WriteLine("Extracting files...");
+                        string appFolder = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, APP_FOLDER_NAME);
+                        if (!Directory.Exists(appFolder))
+                        {
+                            Directory.CreateDirectory(appFolder);
+                        }
+                        
+                        ZipFile.ExtractToDirectory(tempZip, appFolder, overwriteFiles: true);
+                        
+                        File.Delete(tempZip);
                         
                         // Update local version file
                         await File.WriteAllTextAsync(LOCAL_VERSION_FILE, remoteVersion.ToString());
@@ -88,21 +96,26 @@ namespace Launcher
             }
 
             // 3. Launch the main application
-            Console.WriteLine($"Launching {LOCAL_EXE_NAME}...");
-            if (File.Exists(LOCAL_EXE_NAME))
+            string targetExePath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, APP_FOLDER_NAME, LOCAL_EXE_NAME);
+            Console.WriteLine($"Launching {LOCAL_EXE_NAME} from {APP_FOLDER_NAME}...");
+            if (File.Exists(targetExePath))
             {
                 Process.Start(new ProcessStartInfo
                 {
-                    FileName = LOCAL_EXE_NAME,
+                    FileName = targetExePath,
                     UseShellExecute = true,
-                    WorkingDirectory = AppDomain.CurrentDomain.BaseDirectory
+                    WorkingDirectory = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, APP_FOLDER_NAME)
                 });
             }
             else
             {
-                Console.WriteLine($"[FATAL] Cannot find {LOCAL_EXE_NAME} in the current directory.");
+                Console.WriteLine($"[FATAL] Cannot find {LOCAL_EXE_NAME} in the {APP_FOLDER_NAME} directory.");
                 Console.WriteLine("Press any key to exit...");
-                Console.ReadKey();
+                if (!Console.IsInputRedirected)
+                {
+                    Console.ReadKey();
+                }
+                Environment.Exit(1);
             }
             
             // Auto exit
