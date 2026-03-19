@@ -21,3 +21,6 @@ obj/
 # Ignore the published standalone .exe from git tracking except the specific one we are uploading
 **/bin/Release/net8.0/win-x64/publish/WhatsAppTranscriptor.pdb
 **/bin/Release/net8.0/win-x64/publish/WhatsAppTranscriptor.deps.json
+
+TestFolder/
+backend/sample_rip.json

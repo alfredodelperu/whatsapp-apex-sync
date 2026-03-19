@@ -6,6 +6,7 @@ using Microsoft.EntityFrameworkCore;
 using System.Net;
 using System.Timers;
 using System.Linq;
+using System.Windows.Forms;
 
 namespace WhatsAppTranscriptor
 {
@@ -59,7 +60,8 @@ namespace WhatsAppTranscriptor
 
         protected override void OnConfiguring(DbContextOptionsBuilder optionsBuilder)
         {
-            optionsBuilder.UseSqlite("Data Source=whatsapp_messages.db");
+            string dbPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "whatsapp_messages.db");
+            optionsBuilder.UseSqlite($"Data Source={dbPath}");
         }
     }
 
@@ -70,7 +72,8 @@ namespace WhatsAppTranscriptor
 
         protected override void OnConfiguring(DbContextOptionsBuilder optionsBuilder)
         {
-            optionsBuilder.UseSqlite("Data Source=whatsapp_sales.db");
+            string dbPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "whatsapp_sales.db");
+            optionsBuilder.UseSqlite($"Data Source={dbPath}");
         }
 
         protected override void OnModelCreating(ModelBuilder modelBuilder)
@@ -111,19 +114,23 @@ namespace WhatsAppTranscriptor
         public string PagoPrefix { get; set; } = "#PAGO";
         public VentaTags VentaTags { get; set; } = new VentaTags();
         public PagoTags PagoTags { get; set; } = new PagoTags();
+        public List<string> PrinterUrls { get; set; } = new List<string>();
     }
 
     public static class ConfigManager
     {
         public static ConfigSettings Settings { get; private set; } = new ConfigSettings();
 
+        // Get absolute path to config.json ensuring it's in the same folder as the exe
+        private static string ConfigPath => Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "config.json");
+
         public static void LoadConfig()
         {
             try
             {
-                if (File.Exists("config.json"))
+                if (File.Exists(ConfigPath))
                 {
-                    string json = File.ReadAllText("config.json");
+                    string json = File.ReadAllText(ConfigPath);
                     var loaded = JsonSerializer.Deserialize<ConfigSettings>(json);
                     if (loaded != null)
                     {
@@ -138,6 +145,21 @@ namespace WhatsAppTranscriptor
                 Console.WriteLine($"[WARNING] Could not parse config.json. Using legacy hardcoded defaults. Reason: {ex.Message}");
             }
             Console.WriteLine("[INFO] config.json not found. Running in LEGACY STRICT mode.");
+        }
+
+        public static void SaveConfig()
+        {
+            try
+            {
+                var options = new JsonSerializerOptions { WriteIndented = true };
+                string json = JsonSerializer.Serialize(Settings, options);
+                File.WriteAllText(ConfigPath, json);
+                Console.WriteLine($"[INFO] config.json saved successfully to {ConfigPath}");
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"[ERROR] Could not save config.json. Reason: {ex.Message}");
+            }
         }
     }
 
@@ -156,20 +178,39 @@ namespace WhatsAppTranscriptor
     {
         private static System.Timers.Timer? _syncTimer;
 
-        static async Task Main(string[] args)
+        [STAThread]
+        static void Main()
         {
-            Console.WriteLine("Loading Configuration...");
+            Application.EnableVisualStyles();
+            Application.SetCompatibleTextRenderingDefault(false);
+            
+            // 1. MUST load config synchronously before any UI or Server starts
             ConfigManager.LoadConfig();
 
             Console.WriteLine("Initializing Databases...");
-            using (var db = new MessagesDbContext())
+            using (var db1 = new MessagesDbContext()) db1.Database.EnsureCreated();
+            using (var db2 = new SalesDbContext()) db2.Database.EnsureCreated();
+
+            // 2. Run the backend server in a background task
+            Task.Run(RunServerAsync);
+            
+            Application.Run(new Form1());
+        }
+
+        static async Task RunServerAsync()
+        {
+            try
             {
-                db.Database.EnsureCreated();
+                await StartHttpServerAsync();
             }
-            using (var salesDb = new SalesDbContext())
+            catch (Exception ex)
             {
-                salesDb.Database.EnsureCreated();
+                Console.WriteLine($"[FATAL] Error starting server: {ex.Message}");
             }
+        }
+
+        static async Task StartHttpServerAsync()
+        {
             Console.WriteLine(@"
 =========================================================
       WHATSAPP TRANSCRIPTOR & SALES EXTRACTOR V2.2            
